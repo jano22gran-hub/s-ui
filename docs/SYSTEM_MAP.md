@@ -18,7 +18,7 @@ it with every structural change.
 | `api/` | `/api/:action` (session) and `/apiv2/:action` (token). `apiService.go` handlers |
 | `sub/` | Subscription server: links, sing-box JSON, Clash/Mihomo YAML |
 | `util/` | Link generation (`genLink.go`), link → outbound (`linkToJson.go`), external subs |
-| `frontend/` | Submodule `alireza0/s-ui-frontend` (Vue 3 + Vuetify), built into `web/html` |
+| `frontend/` | Submodule `jano22gran-hub/s-ui-frontend` (branch `claude/bold-cori-j3wgpi`) (Vue 3 + Vuetify), built into `web/html` |
 
 ## Data flow
 
