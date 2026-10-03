@@ -293,6 +293,25 @@ func (s *ConfigService) RestartCore() error {
 	return s.startCoreLocked(true)
 }
 
+// ResetAllTraffic runs the global traffic reset and applies it to the running
+// core. Re-enabled users are pushed into their inbounds in place, the same way
+// a manual enable is, which also lifts the mute their sessions got when they
+// were disabled. A full restart is only the fallback (#1278).
+func (s *ConfigService) ResetAllTraffic() error {
+	inboundIds, err := s.ClientService.ResetAllClientsTraffic()
+	if err != nil {
+		return err
+	}
+	if len(inboundIds) == 0 {
+		return nil
+	}
+	if err = s.InboundService.UpdateInboundsUsers(database.GetDB(), inboundIds); err != nil {
+		logger.Warning("reset traffic: in-place user update failed, restarting core: ", err)
+		return s.RestartCore()
+	}
+	return nil
+}
+
 func (s *ConfigService) restartCoreWithConfig(config json.RawMessage) error {
 	if !lifecycleMu.TryLock() {
 		return nil

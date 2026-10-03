@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alireza0/s-ui/database"
@@ -16,6 +17,12 @@ import (
 )
 
 type ClientService struct{}
+
+// clientStateMu serialises the jobs that flip clients between enabled and
+// disabled. The deplete job and the global reset both fire every minute; run
+// together, one could disable a client from a snapshot the other had already
+// reset (#1278).
+var clientStateMu sync.Mutex
 
 func (s *ClientService) Get(id string) (*[]model.Client, error) {
 	if id == "" {
@@ -481,6 +488,9 @@ func (s *ClientService) DepleteClients() ([]uint, error) {
 	var users []string
 	var inboundIds []uint
 
+	clientStateMu.Lock()
+	defer clientStateMu.Unlock()
+
 	dt := time.Now().Unix()
 	db := database.GetDB()
 
@@ -625,14 +635,38 @@ func (s *ClientService) ResetClients(tx *gorm.DB, dt int64) ([]uint, error) {
 }
 
 // ResetAllClientsTraffic zeroes up/down for every client (accumulating into the
-// total counters) and re-enables all of them, in a single bulk update. Used by
-// the global periodic traffic reset; the caller restarts the core afterwards so
-// re-enabled clients take effect.
-func (s *ClientService) ResetAllClientsTraffic() error {
+// total counters) and re-enables all of them, in one transaction. It returns
+// the inbounds of the clients it re-enabled: the caller has to push those users
+// back into the running core, or they stay locked out until a restart (#1278).
+func (s *ClientService) ResetAllClientsTraffic() ([]uint, error) {
+	clientStateMu.Lock()
+	defer clientStateMu.Unlock()
+
+	var err error
+	var inboundIds []uint
 	db := database.GetDB()
 	dt := time.Now().Unix()
 
-	result := db.Model(model.Client{}).
+	tx := db.Begin()
+	defer func() {
+		if err == nil {
+			err = tx.Commit().Error
+		} else {
+			tx.Rollback()
+		}
+	}()
+
+	var disabled []model.Client
+	if err = tx.Model(model.Client{}).Select("inbounds").Where("enable = false").Find(&disabled).Error; err != nil {
+		return nil, err
+	}
+	for _, client := range disabled {
+		var clientInboundIds []uint
+		json.Unmarshal(client.Inbounds, &clientInboundIds)
+		inboundIds = common.UnionUintArray(inboundIds, clientInboundIds)
+	}
+
+	result := tx.Model(model.Client{}).
 		Where("(up + down) > 0 OR enable = false").
 		UpdateColumns(map[string]interface{}{
 			"total_up":   gorm.Expr("total_up + up"),
@@ -641,24 +675,25 @@ func (s *ClientService) ResetAllClientsTraffic() error {
 			"down":       0,
 			"enable":     true,
 		})
-	if result.Error != nil {
-		return result.Error
+	if err = result.Error; err != nil {
+		return nil, err
 	}
 
 	if result.RowsAffected > 0 {
-		if err := db.Create(&model.Changes{
+		err = tx.Create(&model.Changes{
 			DateTime: dt,
 			Actor:    "ResetTrafficJob",
 			Key:      "clients",
 			Action:   "reset",
 			Obj:      json.RawMessage("\"all\""),
-		}).Error; err != nil {
-			return err
+		}).Error
+		if err != nil {
+			return nil, err
 		}
 		LastUpdate = dt
 	}
 
-	return nil
+	return inboundIds, nil
 }
 
 func setConfigIdentity(client *model.Client) error {

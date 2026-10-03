@@ -100,6 +100,12 @@ func GetExternalSub(url string) ([]map[string]interface{}, error) {
 		// if data is a text
 		links := strings.Split(data, "\n")
 		for _, link := range links {
+			// TrimSpace: a CRLF subscription left "\r" on every link, which
+			// url.Parse rejects, so the whole node list vanished.
+			link = strings.TrimSpace(link)
+			if link == "" {
+				continue
+			}
 			linkToJson, _, err := GetOutbound(link, 0)
 			if err == nil {
 				result = append(result, *linkToJson)

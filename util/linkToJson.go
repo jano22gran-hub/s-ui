@@ -38,6 +38,13 @@ func GetOutbound(uri string, i int) (*map[string]interface{}, string, error) {
 	return nil, "", common.NewError("Unsupported link format")
 }
 
+// splitLinkHost returns the host and port of a share link. url.URL.Hostname
+// strips IPv6 brackets and, unlike net.SplitHostPort, still returns the host
+// when the link has no port (#1281).
+func splitLinkHost(u *url.URL) (string, string, error) {
+	return u.Hostname(), u.Port(), nil
+}
+
 func vmess(data string, i int) (*map[string]interface{}, string, error) {
 	dataByte, err := B64StrToByte(data)
 	if err != nil {
@@ -113,6 +120,9 @@ func vmess(data string, i int) (*map[string]interface{}, string, error) {
 			}
 		}
 	}
+	// Some generators bracket an IPv6 "add" as if it were a URI authority.
+	vmessAddr, _ := dataJson["add"].(string)
+	vmessAddr = NormalizeHost(vmessAddr)
 	tag, _ := dataJson["ps"].(string)
 	if i > 0 {
 		tag = fmt.Sprintf("%d.%s", i, tag)
@@ -124,7 +134,7 @@ func vmess(data string, i int) (*map[string]interface{}, string, error) {
 	vmess := map[string]interface{}{
 		"type":        "vmess",
 		"tag":         tag,
-		"server":      dataJson["add"],
+		"server":      vmessAddr,
 		"server_port": dataJson["port"],
 		"uuid":        dataJson["id"],
 		"security":    "auto",
@@ -138,7 +148,7 @@ func vmess(data string, i int) (*map[string]interface{}, string, error) {
 func vless(u *url.URL, i int) (*map[string]interface{}, string, error) {
 	query, _ := url.ParseQuery(u.RawQuery)
 	security := query.Get("security")
-	host, portStr, _ := net.SplitHostPort(u.Host)
+	host, portStr, _ := splitLinkHost(u)
 	port := 80
 	if len(portStr) > 0 {
 		port, _ = strconv.Atoi(portStr)
@@ -168,7 +178,7 @@ func vless(u *url.URL, i int) (*map[string]interface{}, string, error) {
 func trojan(u *url.URL, i int) (*map[string]interface{}, string, error) {
 	query, _ := url.ParseQuery(u.RawQuery)
 	security := query.Get("security")
-	host, portStr, _ := net.SplitHostPort(u.Host)
+	host, portStr, _ := splitLinkHost(u)
 	port := 80
 	if len(portStr) > 0 {
 		port, _ = strconv.Atoi(portStr)
@@ -196,7 +206,7 @@ func trojan(u *url.URL, i int) (*map[string]interface{}, string, error) {
 
 func hy(u *url.URL, i int) (*map[string]interface{}, string, error) {
 	query, _ := url.ParseQuery(u.RawQuery)
-	host, portStr, _ := net.SplitHostPort(u.Host)
+	host, portStr, _ := splitLinkHost(u)
 	port := 443
 	if len(portStr) > 0 {
 		port, _ = strconv.Atoi(portStr)
@@ -241,7 +251,7 @@ func hy(u *url.URL, i int) (*map[string]interface{}, string, error) {
 
 func hy2(u *url.URL, i int) (*map[string]interface{}, string, error) {
 	query, _ := url.ParseQuery(u.RawQuery)
-	host, portStr, _ := net.SplitHostPort(u.Host)
+	host, portStr, _ := splitLinkHost(u)
 	port := 443
 	if len(portStr) > 0 {
 		port, _ = strconv.Atoi(portStr)
@@ -292,7 +302,7 @@ func hy2(u *url.URL, i int) (*map[string]interface{}, string, error) {
 
 func anytls(u *url.URL, i int) (*map[string]interface{}, string, error) {
 	query, _ := url.ParseQuery(u.RawQuery)
-	host, portStr, _ := net.SplitHostPort(u.Host)
+	host, portStr, _ := splitLinkHost(u)
 	port := 443
 	if len(portStr) > 0 {
 		port, _ = strconv.Atoi(portStr)
@@ -320,7 +330,7 @@ func anytls(u *url.URL, i int) (*map[string]interface{}, string, error) {
 
 func tuic(u *url.URL, i int) (*map[string]interface{}, string, error) {
 	query, _ := url.ParseQuery(u.RawQuery)
-	host, portStr, _ := net.SplitHostPort(u.Host)
+	host, portStr, _ := splitLinkHost(u)
 	port := 443
 	if len(portStr) > 0 {
 		port, _ = strconv.Atoi(portStr)
@@ -352,7 +362,7 @@ func tuic(u *url.URL, i int) (*map[string]interface{}, string, error) {
 
 func ss(u *url.URL, i int) (*map[string]interface{}, string, error) {
 	query, _ := url.ParseQuery(u.RawQuery)
-	host, portStr, _ := net.SplitHostPort(u.Host)
+	host, portStr, _ := splitLinkHost(u)
 	port := 443
 	if len(portStr) > 0 {
 		port, _ = strconv.Atoi(portStr)
@@ -440,7 +450,7 @@ func parseNaiveLink(u *url.URL, i int) (*map[string]interface{}, string, error) 
 			return nil, "", common.NewError("Invalid naive link (http2)")
 		}
 	case "naive+https", "naive+quic":
-		host, portStr, _ = net.SplitHostPort(u.Host)
+		host, portStr, _ = splitLinkHost(u)
 		if portStr != "" {
 			port, _ = strconv.Atoi(portStr)
 		} else {

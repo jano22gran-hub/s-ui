@@ -261,3 +261,34 @@ func TestResetUsageCountsTrafficArrivingWhileOpen(t *testing.T) {
 		t.Errorf("totals = %d/%d, want 3500/9000", reset.TotalUp, reset.TotalDown)
 	}
 }
+
+// The global reset re-enables quota-disabled clients; it must report their
+// inbounds so the caller can push them back into the running core (#1278).
+func TestResetAllClientsTrafficReportsReenabledInbounds(t *testing.T) {
+	db := clientTestDB(t)
+	s := &ClientService{}
+
+	off := createClient(t, db, &model.Client{Name: "off", Enable: false, Volume: 10, Up: 8, Down: 8, Inbounds: json.RawMessage(`[1,2]`)})
+	on := createClient(t, db, &model.Client{Name: "on", Enable: true, Up: 3, Down: 4, Inbounds: json.RawMessage(`[3]`)})
+	// GORM skips zero values on Create, so set enable=false explicitly.
+	if err := db.Model(model.Client{}).Where("id = ?", off.Id).Update("enable", false).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	ids, err := s.ResetAllClientsTraffic()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 2 || !((ids[0] == 1 && ids[1] == 2) || (ids[0] == 2 && ids[1] == 1)) {
+		t.Fatalf("inbound ids = %v, want [1 2]", ids)
+	}
+
+	gotOff := reload(t, db, off.Id)
+	if !gotOff.Enable || gotOff.Up != 0 || gotOff.Down != 0 || gotOff.TotalUp != 8 || gotOff.TotalDown != 8 {
+		t.Fatalf("disabled client after reset: %+v", gotOff)
+	}
+	gotOn := reload(t, db, on.Id)
+	if !gotOn.Enable || gotOn.Up != 0 || gotOn.TotalUp != 3 || gotOn.TotalDown != 4 {
+		t.Fatalf("enabled client after reset: %+v", gotOn)
+	}
+}
