@@ -40,3 +40,10 @@ it with every structural change.
 ## Tests
 
 `go test ./...`; real-binary tunnel test: `SUI_MDV_BIN=/path/to/server go test ./service -run DnsTunnel`.
+
+## Frontend (s-ui-frontend fork, branch `claude/bold-cori-j3wgpi`)
+
+- Nav groups: `src/layouts/default/Drawer.vue` (Overview / Users / Routing / Services / System).
+- DNS tunnels: `src/views/DnsTunnels.vue` (polls `api/dnstunnels` every 5s), `src/layouts/modals/DnsTunnel.vue`, `src/types/dnsTunnels.ts`, store field `dnsTunnels` (`api/load` key `dnstunnels`).
+- Clients volume column sorts by `up + down` (`src/views/Clients.vue` headers).
+- Strings: `src/locales/{en,fa}.ts` keys `pages.dnstunnels`, `objects.dnstunnel`, `dnstunnel.*`, `menu.*`; other locales fall back to en.
