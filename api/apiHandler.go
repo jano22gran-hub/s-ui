@@ -66,6 +66,8 @@ func (a *APIHandler) postHandler(c *gin.Context) {
 		a.ApiService.CloseSessions(c)
 	case "getCertPing":
 		a.ApiService.GetCertPing(c)
+	case "dnstunnelInstall":
+		a.ApiService.DnsTunnelInstall(c)
 	default:
 		jsonMsg(c, "failed", common.NewError("unknown action: ", action))
 	}
@@ -79,7 +81,7 @@ func (a *APIHandler) getHandler(c *gin.Context) {
 		a.ApiService.Logout(c)
 	case "load":
 		a.ApiService.LoadData(c)
-	case "inbounds", "outbounds", "endpoints", "services", "tls", "clients", "config":
+	case "inbounds", "outbounds", "endpoints", "services", "tls", "clients", "config", "dnstunnels":
 		err := a.ApiService.LoadPartialData(c, []string{action})
 		if err != nil {
 			jsonMsg(c, action, err)
@@ -109,6 +111,8 @@ func (a *APIHandler) getHandler(c *gin.Context) {
 		a.ApiService.GetTokens(c)
 	case "singbox-config":
 		a.ApiService.GetSingboxConfig(c)
+	case "dnstunnelClient":
+		a.ApiService.DnsTunnelClient(c)
 	case "checkOutbound":
 		a.ApiService.GetCheckOutbound(c)
 	default:

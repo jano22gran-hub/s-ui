@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/alireza0/s-ui/database"
+	"github.com/alireza0/s-ui/dnstunnel"
 	"github.com/alireza0/s-ui/logger"
 	"github.com/alireza0/s-ui/service"
 	"github.com/alireza0/s-ui/util"
@@ -25,6 +26,7 @@ type ApiService struct {
 	service.OutboundService
 	service.EndpointService
 	service.ServicesService
+	service.DnsTunnelService
 	service.PanelService
 	service.StatsService
 	service.ServerService
@@ -113,6 +115,11 @@ func (a *ApiService) getData(c *gin.Context) (interface{}, error) {
 		data["outbounds"] = outbounds
 		data["endpoints"] = endpoints
 		data["services"] = services
+		dnsTunnels, err := a.DnsTunnelService.GetAll()
+		if err != nil {
+			return "", err
+		}
+		data["dnstunnels"] = dnsTunnels
 		data["subURI"] = subURI
 		data["enableTraffic"] = trafficAge > 0
 		data["onlines"] = onlines
@@ -178,6 +185,13 @@ func (a *ApiService) LoadPartialData(c *gin.Context, objs []string) error {
 				return err
 			}
 			data[obj] = settings
+		case "dnstunnels":
+			tunnels, err := a.DnsTunnelService.GetAll()
+			if err != nil {
+				return err
+			}
+			data[obj] = tunnels
+			data["mdvVersion"] = dnstunnel.Version()
 		}
 	}
 
@@ -385,6 +399,18 @@ func (a *ApiService) SetMaintenance(c *gin.Context) {
 func (a *ApiService) ResetTraffic(c *gin.Context) {
 	err := a.ConfigService.ResetAllTraffic()
 	jsonMsg(c, "resetTraffic", err)
+}
+
+// DnsTunnelInstall downloads the MasterDnsVPN server, the latest release
+// unless "version" names a tag.
+func (a *ApiService) DnsTunnelInstall(c *gin.Context) {
+	name, err := a.DnsTunnelService.Install(c.Request.FormValue("version"))
+	jsonObj(c, name, err)
+}
+
+func (a *ApiService) DnsTunnelClient(c *gin.Context) {
+	cfg, err := a.DnsTunnelService.ClientConfig(c.Query("tag"))
+	jsonObj(c, cfg, err)
 }
 
 func (a *ApiService) LinkConvert(c *gin.Context) {

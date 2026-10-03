@@ -29,6 +29,7 @@ func seedEveryTable(t *testing.T) {
 		&model.Outbound{Type: "direct", Tag: "out-1", Options: json.RawMessage(`{}`)},
 		&model.Service{Type: "derp", Tag: "svc-1", Options: json.RawMessage(`{}`)},
 		&model.Endpoint{Type: "wireguard", Tag: "ep-1", Options: json.RawMessage(`{}`)},
+		&model.DnsTunnel{Tag: "dns-1", Domain: "t.example.com", Port: 53, Inbound: "in-1"},
 		&model.Tokens{UserId: 1, Token: "a-token", Desc: "for the test", Expiry: 0},
 		&model.Stats{DateTime: 1, Resource: "user", Tag: "someone", Direction: true, Traffic: 42},
 		&model.Client{Name: "someone", Enable: true, Config: json.RawMessage(`{}`), Inbounds: json.RawMessage(`[]`), Links: json.RawMessage(`[]`)},

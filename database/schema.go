@@ -26,6 +26,7 @@ func schema() []table {
 		{"outbounds", &model.Outbound{}, copyRows[model.Outbound]},
 		{"services", &model.Service{}, copyRows[model.Service]},
 		{"endpoints", &model.Endpoint{}, copyRows[model.Endpoint]},
+		{"dns_tunnels", &model.DnsTunnel{}, copyRows[model.DnsTunnel]},
 		{"users", &model.User{}, copyRows[model.User]},
 		{"tokens", &model.Tokens{}, copyRows[model.Tokens]},
 		{"stats", &model.Stats{}, copyRows[model.Stats]},

@@ -7,6 +7,7 @@ import (
 	"github.com/alireza0/s-ui/core"
 	"github.com/alireza0/s-ui/cronjob"
 	"github.com/alireza0/s-ui/database"
+	"github.com/alireza0/s-ui/dnstunnel"
 	"github.com/alireza0/s-ui/logger"
 	"github.com/alireza0/s-ui/service"
 	"github.com/alireza0/s-ui/sub"
@@ -94,6 +95,7 @@ func (a *APP) Start() error {
 			logger.Error(err)
 		}
 	}
+	a.configService.DnsTunnelService.Sync()
 
 	return nil
 }
@@ -112,6 +114,7 @@ func (a *APP) Stop() {
 	if err != nil {
 		logger.Warning("stop Core err:", err)
 	}
+	dnstunnel.StopAll()
 }
 
 func (a *APP) initLog() {

@@ -35,6 +35,7 @@ type ConfigService struct {
 	OutboundService
 	ServicesService
 	EndpointService
+	DnsTunnelService
 }
 
 // SingBoxConfig is the shape GetConfig decodes the stored base config into
@@ -414,6 +415,12 @@ func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initU
 			logger.Error("failed to commit config save: ", cErr)
 			return
 		}
+		// A tunnel forwards into an inbound as a client, so a change to
+		// any of the three can change what its process should run.
+		switch obj {
+		case "dnstunnels", "inbounds", "clients":
+			go s.DnsTunnelService.Sync()
+		}
 		if restartWith != nil {
 			// Detached: a restart takes seconds and this is an HTTP handler.
 			// The recover is required -- a panic here is outside gin's reach.
@@ -456,6 +463,8 @@ func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initU
 		err = s.ServicesService.Save(tx, act, data)
 	case "endpoints":
 		err = s.EndpointService.Save(tx, act, data)
+	case "dnstunnels":
+		err = s.DnsTunnelService.Save(tx, act, data)
 	case "config":
 		err = s.SettingService.SaveConfig(tx, data)
 		if err != nil {
