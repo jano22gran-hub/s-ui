@@ -7,6 +7,8 @@
 [![Downloads](https://img.shields.io/github/downloads/alireza0/s-ui/total.svg)](https://img.shields.io/github/downloads/alireza0/s-ui/total.svg)
 [![License](https://img.shields.io/badge/license-GPL%20V3-blue.svg?longCache=true)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
+> **Fork:** this is `jano22gran-hub/s-ui`, based on alireza0/s-ui v1.6.3, adding a panel-managed DNS tunnel (MasterDnsVPN), grouped navigation, usage sort, and fixes for #1278/#1281. See `docs/SYSTEM_MAP.md`.
+
 > **Disclaimer:** This project is only for personal learning and communication, please do not use it for illegal purposes, please do not use it in a production environment
 
 **If you think this project is helpful to you, you may wish to give a**:star2:
@@ -68,7 +70,7 @@ Full documentation lives in the [Wiki](https://github.com/alireza0/s-ui/wiki):
 
 ### Linux/macOS
 ```sh
-bash <(curl -Ls https://raw.githubusercontent.com/alireza0/s-ui/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/jano22gran-hub/s-ui/main/install.sh)
 ```
 
 #### Installer language
@@ -76,7 +78,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/alireza0/s-ui/master/install.s
 The installer is available in the same six languages as the panel: `en` (default), `fa`, `ru`, `vi`, `zhcn`, `zhtw`. Choose one with the `SUI_LANG` environment variable (when unset, your system `$LANG` is used as a hint):
 
 ```sh
-SUI_LANG=fa bash <(curl -Ls https://raw.githubusercontent.com/alireza0/s-ui/master/install.sh)
+SUI_LANG=fa bash <(curl -Ls https://raw.githubusercontent.com/jano22gran-hub/s-ui/main/install.sh)
 ```
 
 ### Alpine Linux
@@ -84,7 +86,7 @@ Alpine uses `apk` and OpenRC instead of `apt`/systemd. The install script detect
 
 ```sh
 apk add bash
-bash <(curl -Ls https://raw.githubusercontent.com/alireza0/s-ui/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/jano22gran-hub/s-ui/main/install.sh)
 ```
 
 Manage the service with OpenRC: `rc-service s-ui start|stop|restart` and `rc-update add s-ui default`.
@@ -100,7 +102,7 @@ Manage the service with OpenRC: `rc-service s-ui start|stop|restart` and `rc-upd
 **Step 1:** To install your desired legacy version, add the version to the end of the installation command. e.g., ver `v1.5.0`:
 
 ```sh
-VERSION=v1.5.0 && bash <(curl -Ls https://raw.githubusercontent.com/alireza0/s-ui/$VERSION/install.sh) $VERSION
+VERSION=v1.5.0 && bash <(curl -Ls https://raw.githubusercontent.com/jano22gran-hub/s-ui/$VERSION/install.sh) $VERSION
 ```
 
 ## Manual installation

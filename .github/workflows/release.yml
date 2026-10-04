@@ -339,5 +339,5 @@ jobs:
           tag: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref_name }}
           file: dist/*
           file_glob: true
-          prerelease: true
+          prerelease: false
           overwrite: true
