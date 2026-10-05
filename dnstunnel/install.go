@@ -99,14 +99,7 @@ func Install(version string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var entry *zip.File
-	for _, f := range zr.File {
-		base := filepath.Base(f.Name)
-		if strings.HasPrefix(base, "MasterDnsVPN_Server") && !strings.Contains(base, ".") {
-			entry = f
-			break
-		}
-	}
+	entry := findServerBinary(zr)
 	if entry == nil {
 		return "", common.NewError("server binary not found in release archive")
 	}
@@ -140,4 +133,22 @@ func Install(version string) (string, error) {
 		return "", err
 	}
 	return filepath.Base(entry.Name), nil
+}
+
+// findServerBinary picks the executable out of a release zip. Its name carries
+// the version ("MasterDnsVPN_Server_Linux_AMD64_v2026.06.13.234407-7de2476"),
+// dots included, so it is told apart from server_config.toml by extension.
+func findServerBinary(zr *zip.Reader) *zip.File {
+	for _, f := range zr.File {
+		base := filepath.Base(f.Name)
+		if f.FileInfo().IsDir() || !strings.HasPrefix(base, "MasterDnsVPN_Server") {
+			continue
+		}
+		switch strings.ToLower(filepath.Ext(base)) {
+		case ".toml", ".txt", ".md", ".json", ".sh", ".exe":
+			continue
+		}
+		return f
+	}
+	return nil
 }
