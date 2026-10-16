@@ -278,6 +278,17 @@ func (j *JsonService) addOthers(jsonConfig *map[string]interface{}) error {
 		map[string]interface{}{
 			"action": "sniff",
 		},
+		// Without this the TUN forwards DNS as plain UDP through the proxy,
+		// often to a LAN resolver (192.168.x.x) the server cannot reach.
+		map[string]interface{}{
+			"protocol": "dns",
+			"action":   "hijack-dns",
+		},
+		map[string]interface{}{
+			"ip_is_private": true,
+			"action":        "route",
+			"outbound":      "direct",
+		},
 		map[string]interface{}{
 			"clash_mode": "Direct",
 			"action":     "route",
@@ -300,6 +311,8 @@ func (j *JsonService) addOthers(jsonConfig *map[string]interface{}) error {
 		return err
 	}
 	if len(othersStr) == 0 {
+		(*jsonConfig)["dns"] = defaultDNS()
+		route["default_domain_resolver"] = defaultLocalDNSTag
 		(*jsonConfig)["route"] = route
 		return nil
 	}
@@ -313,6 +326,8 @@ func (j *JsonService) addOthers(jsonConfig *map[string]interface{}) error {
 	}
 	if _, ok := othersJson["dns"]; ok {
 		(*jsonConfig)["dns"] = othersJson["dns"]
+	} else {
+		(*jsonConfig)["dns"] = defaultDNS()
 	}
 	if _, ok := othersJson["inbounds"]; ok {
 		(*jsonConfig)["inbounds"] = othersJson["inbounds"]
@@ -329,6 +344,8 @@ func (j *JsonService) addOthers(jsonConfig *map[string]interface{}) error {
 	}
 	if defaultDomainResolver, ok := othersJson["default_domain_resolver"].(string); ok && defaultDomainResolver != "" {
 		route["default_domain_resolver"] = defaultDomainResolver
+	} else if _, ok := othersJson["dns"]; !ok {
+		route["default_domain_resolver"] = defaultLocalDNSTag
 	} else if fallback := fallbackDomainResolver(othersJson); fallback != "" {
 		// With more than one DNS server and no resolver named for dial fields,
 		// sing-box has to guess which one resolves outbound server domains and
@@ -345,6 +362,25 @@ func (j *JsonService) addOthers(jsonConfig *map[string]interface{}) error {
 	(*jsonConfig)["route"] = route
 
 	return nil
+}
+
+// defaultLocalDNSTag resolves outbound server domains and direct traffic.
+const defaultLocalDNSTag = "local"
+
+// defaultDNS is used when the template has no dns block: queries go through
+// the proxy over DoH (no ISP poisoning, no leak), the "Direct" clash mode
+// and server domains use the system resolver.
+func defaultDNS() map[string]interface{} {
+	return map[string]interface{}{
+		"servers": []interface{}{
+			map[string]interface{}{"type": "https", "tag": "remote", "server": "1.1.1.1", "detour": "proxy"},
+			map[string]interface{}{"type": "local", "tag": defaultLocalDNSTag},
+		},
+		"rules": []interface{}{
+			map[string]interface{}{"clash_mode": "Direct", "server": defaultLocalDNSTag},
+		},
+		"final": "remote",
+	}
 }
 
 // fallbackDomainResolver returns the DNS server dial fields should resolve

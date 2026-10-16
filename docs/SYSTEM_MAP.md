@@ -28,6 +28,12 @@ it with every structural change.
 - Disable (quota/expiry): `DepleteJob` → `UpdateInboundsUsers` (in place, cuts sessions).
 - Global reset: `ResetTrafficJob` → `ConfigService.ResetAllTraffic` → in-place re-add, restart only on failure. `clientStateMu` serialises with deplete.
 
+## Client subscription JSON (`sub/jsonService.go`)
+
+- No template (`subJsonExt` empty) → TUN+mixed inbounds, `proxy` selector / `auto` urltest / `direct`, rules: sniff → hijack-dns → `ip_is_private` direct → clash modes.
+- Template without `dns` → `defaultDNS()`: `remote` DoH 1.1.1.1 via `proxy` (final), `local` for Direct mode + `default_domain_resolver`.
+- Server-side tips: YouTube "not a bot" = server IP reputation → Ruleset preset `geosite-youtube`/`google` routed to a Warp endpoint.
+
 ## DNS tunnel (MasterDnsVPN)
 
 - Table `dns_tunnels`: tag, enable, domain (NS-delegated zone), listen, port (53), method 0–5, key (hex, auto), inbound (socks|mixed tag), client (name), options (extra upper-case MDV keys).
