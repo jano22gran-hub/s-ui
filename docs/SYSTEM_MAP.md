@@ -18,7 +18,7 @@ it with every structural change.
 | `api/` | `/api/:action` (session) and `/apiv2/:action` (token). `apiService.go` handlers |
 | `sub/` | Subscription server: links, sing-box JSON, Clash/Mihomo YAML |
 | `util/` | Link generation (`genLink.go`), link → outbound (`linkToJson.go`), external subs |
-| `frontend/` | Submodule `jano22gran-hub/s-ui-frontend` (branch `claude/serene-knuth-2zms56`) (Vue 3 + Vuetify), built into `web/html` |
+| `frontend/` | Submodule `jano22gran-hub/s-ui-frontend` (branch `main`) (Vue 3 + Vuetify), built into `web/html` |
 
 ## Data flow
 
@@ -41,7 +41,7 @@ it with every structural change.
 
 `go test ./...`; real-binary tunnel test: `SUI_MDV_BIN=/path/to/server go test ./service -run DnsTunnel`.
 
-## Frontend (s-ui-frontend fork, branch `claude/serene-knuth-2zms56`)
+## Frontend (s-ui-frontend fork, branch `main`)
 
 - Nav groups: `src/layouts/default/Drawer.vue` (Overview / Users / Routing / Services / System).
 - DNS tunnels: `src/views/DnsTunnels.vue` (polls `api/dnstunnels` every 5s), `src/layouts/modals/DnsTunnel.vue`, `src/types/dnsTunnels.ts`, store field `dnsTunnels` (`api/load` key `dnstunnels`).
