@@ -1,4 +1,4 @@
 [submodule "frontend"]
 	path = frontend
 	url = https://github.com/jano22gran-hub/s-ui-frontend
-	branch = claude/serene-knuth-2zms56
+	branch = main
