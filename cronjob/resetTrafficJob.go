@@ -3,12 +3,14 @@ package cronjob
 import (
 	"time"
 
+	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/logger"
 	"github.com/alireza0/s-ui/service"
 )
 
 type ResetTrafficJob struct {
-	service.ConfigService
+	service.ClientService
+	service.InboundService
 	service.SettingService
 }
 
@@ -61,9 +63,20 @@ func (s *ResetTrafficJob) Run() {
 		return
 	}
 
-	if err = s.ConfigService.ResetAllTraffic(); err != nil {
+	inboundIds, err := s.ClientService.ResetAllClientsTraffic()
+	if err != nil {
 		logger.Warning("ResetTrafficJob: reset all clients failed: ", err)
 		return
+	}
+
+	// Before the bookkeeping write: clients are re-enabled in the database but
+	// the core still holds the old user list. Updated in place, as the deplete
+	// job does, rather than by restarting the core: a restart left every QUIC
+	// client timing out on its dead session for ~30s (#1278).
+	if len(inboundIds) > 0 {
+		if err = s.InboundService.UpdateInboundsUsers(database.GetDB(), inboundIds); err != nil {
+			logger.Error("ResetTrafficJob: unable to update inbound users: ", err)
+		}
 	}
 
 	// Advance to the next boundary. schedule.Next returns the nearest upcoming

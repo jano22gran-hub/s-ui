@@ -18,7 +18,7 @@ it with every structural change.
 | `api/` | `/api/:action` (session) and `/apiv2/:action` (token). `apiService.go` handlers |
 | `sub/` | Subscription server: links, sing-box JSON, Clash/Mihomo YAML |
 | `util/` | Link generation (`genLink.go`), link → outbound (`linkToJson.go`), external subs |
-| `frontend/` | Submodule `jano22gran-hub/s-ui-frontend` (branch `claude/bold-cori-j3wgpi`) (Vue 3 + Vuetify), built into `web/html` |
+| `frontend/` | Submodule `jano22gran-hub/s-ui-frontend` (branch `claude/serene-knuth-2zms56`) (Vue 3 + Vuetify), built into `web/html` |
 
 ## Data flow
 
@@ -41,9 +41,14 @@ it with every structural change.
 
 `go test ./...`; real-binary tunnel test: `SUI_MDV_BIN=/path/to/server go test ./service -run DnsTunnel`.
 
-## Frontend (s-ui-frontend fork, branch `claude/bold-cori-j3wgpi`)
+## Frontend (s-ui-frontend fork, branch `claude/serene-knuth-2zms56`)
 
 - Nav groups: `src/layouts/default/Drawer.vue` (Overview / Users / Routing / Services / System).
 - DNS tunnels: `src/views/DnsTunnels.vue` (polls `api/dnstunnels` every 5s), `src/layouts/modals/DnsTunnel.vue`, `src/types/dnsTunnels.ts`, store field `dnsTunnels` (`api/load` key `dnstunnels`).
 - Clients volume column sorts by `up + down` (`src/views/Clients.vue` headers).
 - Strings: `src/locales/{en,fa}.ts` keys `pages.dnstunnels`, `objects.dnstunnel`, `dnstunnel.*`, `menu.*`; other locales fall back to en.
+
+## Upstream sync
+- Synced with `alireza0/s-ui` v1.6.7 (fork version `1.6.7-dns.1`).
+- In-panel update (`service/update.go`, `service/upgrade.go`) and `s-ui.sh` point to `jano22gran-hub/s-ui` releases; tags `vX.Y.Z-dns.N` accepted, `-dns.N` compared as a 4th component.
+- Global traffic reset: `ConfigService.ResetAllTraffic` (in-place user update, core restart fallback).

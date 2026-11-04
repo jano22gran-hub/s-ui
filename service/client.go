@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/alireza0/s-ui/database"
@@ -17,12 +16,6 @@ import (
 )
 
 type ClientService struct{}
-
-// clientStateMu serialises the jobs that flip clients between enabled and
-// disabled. The deplete job and the global reset both fire every minute; run
-// together, one could disable a client from a snapshot the other had already
-// reset (#1278).
-var clientStateMu sync.Mutex
 
 func (s *ClientService) Get(id string) (*[]model.Client, error) {
 	if id == "" {
@@ -263,9 +256,13 @@ func (s *ClientService) preserveServerOwnedFields(tx *gorm.DB, client *model.Cli
 	client.TotalDown = existing.TotalDown
 }
 
-// clientNameJSON encodes a client name for the changes log. Built by string
-// concatenation, a name with a quote or backslash produced unreadable JSON --
-// cmd/migration/1_1.go already repairs the previous generation of this bug.
+func linkRemark(prefix bool, remark string) string {
+	if !prefix {
+		return ""
+	}
+	return remark
+}
+
 func clientNameJSON(name string) json.RawMessage {
 	encoded, err := json.Marshal(name)
 	if err != nil {
@@ -276,6 +273,7 @@ func clientNameJSON(name string) json.RawMessage {
 }
 
 func (s *ClientService) updateLinksWithFixedInbounds(tx *gorm.DB, clients []*model.Client, hostname string) error {
+	remarkPrefix := (&SettingService{}).SubRemarkPrefix(tx)
 	clientInboundIds := make([][]uint, len(clients))
 	var allIds []uint
 	for i, client := range clients {
@@ -312,7 +310,7 @@ func (s *ClientService) updateLinksWithFixedInbounds(tx *gorm.DB, clients []*mod
 			if !ok {
 				continue
 			}
-			newLinks := util.LinkGenerator(client.Config, inbound, hostname, client.Remark)
+			newLinks := util.LinkGenerator(client.Config, inbound, hostname, linkRemark(remarkPrefix, client.Remark))
 			for _, newLink := range newLinks {
 				newClientLinks = append(newClientLinks, map[string]string{
 					"remark": inbound.Tag,
@@ -339,6 +337,7 @@ func (s *ClientService) updateLinksWithFixedInbounds(tx *gorm.DB, clients []*mod
 }
 
 func (s *ClientService) UpdateClientsOnInboundAdd(tx *gorm.DB, initIds string, inboundId uint, hostname string) error {
+	remarkPrefix := (&SettingService{}).SubRemarkPrefix(tx)
 	clientIds := strings.Split(initIds, ",")
 	var clients []model.Client
 	err := tx.Model(model.Client{}).Where("id in ?", clientIds).Find(&clients).Error
@@ -362,7 +361,7 @@ func (s *ClientService) UpdateClientsOnInboundAdd(tx *gorm.DB, initIds string, i
 		// Add links
 		var clientLinks, newClientLinks []map[string]string
 		json.Unmarshal(client.Links, &clientLinks)
-		newLinks := util.LinkGenerator(client.Config, &inbound, hostname, client.Remark)
+		newLinks := util.LinkGenerator(client.Config, &inbound, hostname, linkRemark(remarkPrefix, client.Remark))
 		for _, newLink := range newLinks {
 			newClientLinks = append(newClientLinks, map[string]string{
 				"remark": inbound.Tag,
@@ -390,7 +389,7 @@ func (s *ClientService) UpdateClientsOnInboundAdd(tx *gorm.DB, initIds string, i
 
 func (s *ClientService) UpdateClientsOnInboundDelete(tx *gorm.DB, id uint, tag string) error {
 	var clientIds []uint
-	err := tx.Raw("SELECT clients.id FROM clients, json_each(clients.inbounds) AS je WHERE je.value = ?", id).Scan(&clientIds).Error
+	err := tx.Raw("SELECT clients.id FROM clients, json_each(CAST(clients.inbounds AS TEXT)) AS je WHERE je.value = ?", id).Scan(&clientIds).Error
 	if err != nil {
 		return err
 	}
@@ -436,10 +435,11 @@ func (s *ClientService) UpdateClientsOnInboundDelete(tx *gorm.DB, id uint, tag s
 }
 
 func (s *ClientService) UpdateLinksByInboundChange(tx *gorm.DB, inbounds *[]model.Inbound, hostname string, oldTag string) error {
+	remarkPrefix := (&SettingService{}).SubRemarkPrefix(tx)
 	var err error
 	for _, inbound := range *inbounds {
 		var clientIds []uint
-		err = tx.Raw("SELECT clients.id FROM clients, json_each(clients.inbounds) AS je WHERE je.value = ?", inbound.Id).Scan(&clientIds).Error
+		err = tx.Raw("SELECT clients.id FROM clients, json_each(CAST(clients.inbounds AS TEXT)) AS je WHERE je.value = ?", inbound.Id).Scan(&clientIds).Error
 		if err != nil {
 			return err
 		}
@@ -454,7 +454,7 @@ func (s *ClientService) UpdateLinksByInboundChange(tx *gorm.DB, inbounds *[]mode
 		for _, client := range clients {
 			var clientLinks, newClientLinks []map[string]string
 			json.Unmarshal(client.Links, &clientLinks)
-			newLinks := util.LinkGenerator(client.Config, &inbound, hostname, client.Remark)
+			newLinks := util.LinkGenerator(client.Config, &inbound, hostname, linkRemark(remarkPrefix, client.Remark))
 			for _, newLink := range newLinks {
 				newClientLinks = append(newClientLinks, map[string]string{
 					"remark": inbound.Tag,
@@ -487,9 +487,6 @@ func (s *ClientService) DepleteClients() ([]uint, error) {
 	var changes []model.Changes
 	var users []string
 	var inboundIds []uint
-
-	clientStateMu.Lock()
-	defer clientStateMu.Unlock()
 
 	dt := time.Now().Unix()
 	db := database.GetDB()
@@ -606,6 +603,13 @@ func (s *ClientService) ResetClients(tx *gorm.DB, dt int64) ([]uint, error) {
 		client.TotalDown += client.Down
 		client.Up = 0
 		client.Down = 0
+		changes = append(changes, model.Changes{
+			DateTime: dt,
+			Actor:    "ResetJob",
+			Key:      "clients",
+			Action:   "reset",
+			Obj:      clientNameJSON(client.Name),
+		})
 		if !client.Enable {
 			client.Enable = true
 			var clientInboundIds []uint
@@ -635,64 +639,55 @@ func (s *ClientService) ResetClients(tx *gorm.DB, dt int64) ([]uint, error) {
 }
 
 // ResetAllClientsTraffic zeroes up/down for every client (accumulating into the
-// total counters) and re-enables all of them, in one transaction. It returns
-// the inbounds of the clients it re-enabled: the caller has to push those users
-// back into the running core, or they stay locked out until a restart (#1278).
+// total counters) and re-enables all of them, in a single bulk update. Used by
+// the global periodic traffic reset. Returns the inbounds of the clients it
+// re-enabled, whose users the caller updates in the running core.
 func (s *ClientService) ResetAllClientsTraffic() ([]uint, error) {
-	clientStateMu.Lock()
-	defer clientStateMu.Unlock()
-
-	var err error
-	var inboundIds []uint
 	db := database.GetDB()
 	dt := time.Now().Unix()
+	var inboundIds []uint
 
-	tx := db.Begin()
-	defer func() {
-		if err == nil {
-			err = tx.Commit().Error
-		} else {
-			tx.Rollback()
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var disabled []model.Client
+		if err := tx.Model(model.Client{}).Select("inbounds").Where("enable = false").Find(&disabled).Error; err != nil {
+			return err
 		}
-	}()
+		for _, client := range disabled {
+			var userInbounds []uint
+			json.Unmarshal(client.Inbounds, &userInbounds)
+			inboundIds = common.UnionUintArray(inboundIds, userInbounds)
+		}
 
-	var disabled []model.Client
-	if err = tx.Model(model.Client{}).Select("inbounds").Where("enable = false").Find(&disabled).Error; err != nil {
+		result := tx.Model(model.Client{}).
+			Where("(up + down) > 0 OR enable = false").
+			UpdateColumns(map[string]interface{}{
+				"total_up":   gorm.Expr("total_up + up"),
+				"total_down": gorm.Expr("total_down + down"),
+				"up":         0,
+				"down":       0,
+				"enable":     true,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+
+		if result.RowsAffected > 0 {
+			if err := tx.Create(&model.Changes{
+				DateTime: dt,
+				Actor:    "ResetTrafficJob",
+				Key:      "clients",
+				Action:   "reset",
+				Obj:      json.RawMessage("\"all\""),
+			}).Error; err != nil {
+				return err
+			}
+			LastUpdate = dt
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	for _, client := range disabled {
-		var clientInboundIds []uint
-		json.Unmarshal(client.Inbounds, &clientInboundIds)
-		inboundIds = common.UnionUintArray(inboundIds, clientInboundIds)
-	}
-
-	result := tx.Model(model.Client{}).
-		Where("(up + down) > 0 OR enable = false").
-		UpdateColumns(map[string]interface{}{
-			"total_up":   gorm.Expr("total_up + up"),
-			"total_down": gorm.Expr("total_down + down"),
-			"up":         0,
-			"down":       0,
-			"enable":     true,
-		})
-	if err = result.Error; err != nil {
-		return nil, err
-	}
-
-	if result.RowsAffected > 0 {
-		err = tx.Create(&model.Changes{
-			DateTime: dt,
-			Actor:    "ResetTrafficJob",
-			Key:      "clients",
-			Action:   "reset",
-			Obj:      json.RawMessage("\"all\""),
-		}).Error
-		if err != nil {
-			return nil, err
-		}
-		LastUpdate = dt
-	}
-
 	return inboundIds, nil
 }
 
