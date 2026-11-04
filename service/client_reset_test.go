@@ -262,33 +262,40 @@ func TestResetUsageCountsTrafficArrivingWhileOpen(t *testing.T) {
 	}
 }
 
-// The global reset re-enables quota-disabled clients; it must report their
-// inbounds so the caller can push them back into the running core (#1278).
-func TestResetAllClientsTrafficReportsReenabledInbounds(t *testing.T) {
+// A periodic reset that re-enables a depleted client must move LastUpdate, or
+// the panel never reloads and keeps showing the client as disabled (#1287).
+func TestPeriodicResetReenablesAndAnnounces(t *testing.T) {
 	db := clientTestDB(t)
 	s := &ClientService{}
 
-	off := createClient(t, db, &model.Client{Name: "off", Enable: false, Volume: 10, Up: 8, Down: 8, Inbounds: json.RawMessage(`[1,2]`)})
-	on := createClient(t, db, &model.Client{Name: "on", Enable: true, Up: 3, Down: 4, Inbounds: json.RawMessage(`[3]`)})
-	// GORM skips zero values on Create, so set enable=false explicitly.
-	if err := db.Model(model.Client{}).Where("id = ?", off.Id).Update("enable", false).Error; err != nil {
+	const now = int64(1_000_000)
+	c := createClient(t, db, &model.Client{
+		Name:      "depleted",
+		Enable:    true,
+		AutoReset: true,
+		ResetDays: 30,
+		NextReset: now - 1,
+		Volume:    100,
+		Up:        200,
+		Inbounds:  json.RawMessage(`[7]`),
+	})
+	if err := db.Model(model.Client{}).Where("id = ?", c.Id).Update("enable", false).Error; err != nil {
 		t.Fatal(err)
 	}
+	LastUpdate = 0
 
-	ids, err := s.ResetAllClientsTraffic()
+	ids, err := s.ResetClients(db, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ids) != 2 || !((ids[0] == 1 && ids[1] == 2) || (ids[0] == 2 && ids[1] == 1)) {
-		t.Fatalf("inbound ids = %v, want [1 2]", ids)
+	got := reload(t, db, c.Id)
+	if !got.Enable || got.Up != 0 {
+		t.Errorf("expected enabled with traffic reset, got enable=%v up=%d", got.Enable, got.Up)
 	}
-
-	gotOff := reload(t, db, off.Id)
-	if !gotOff.Enable || gotOff.Up != 0 || gotOff.Down != 0 || gotOff.TotalUp != 8 || gotOff.TotalDown != 8 {
-		t.Fatalf("disabled client after reset: %+v", gotOff)
+	if len(ids) != 1 || ids[0] != 7 {
+		t.Errorf("expected its inbound to be updated, got %v", ids)
 	}
-	gotOn := reload(t, db, on.Id)
-	if !gotOn.Enable || gotOn.Up != 0 || gotOn.TotalUp != 3 || gotOn.TotalDown != 4 {
-		t.Fatalf("enabled client after reset: %+v", gotOn)
+	if LastUpdate != now {
+		t.Errorf("LastUpdate = %d, want %d so the panel reloads", LastUpdate, now)
 	}
 }
