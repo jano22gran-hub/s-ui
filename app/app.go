@@ -42,6 +42,7 @@ func (a *APP) Init() error {
 
 	// Init Setting
 	a.SettingService.GetAllSetting()
+	a.SettingService.ApplyLogLevel()
 
 	a.core = core.NewCore()
 

@@ -37,6 +37,13 @@ it with every structural change.
 - Note: MDV refuses loopback/private *targets*; the forward hop itself may be loopback.
 - DNS setup: `A ns.example.com → server IP`, `NS t.example.com → ns.example.com`; port 53/udp must be free (disable systemd-resolved stub).
 
+## Logging
+
+- Panel level: setting `logLevel` (`""|debug|info|warn|error`, Settings → general). Applied at boot (`app.Init` → `SettingService.ApplyLogLevel`) and after every `settings` save. `SUI_DEBUG` / `SUI_LOG_LEVEL` env override it.
+- `logger/`: `SetLevel`, `ParseLevel`; the in-memory buffer (`GetLogs`, `/api/logs`) only keeps lines at or above the active level.
+- sing-box core level = `config.log.level` (Basics page, stored in setting `config`); core lines also pass through the panel level.
+- Frontend `Logs.vue` remembers filter/count in `localStorage` key `sui.logs.prefs`.
+
 ## Tests
 
 `go test ./...`; real-binary tunnel test: `SUI_MDV_BIN=/path/to/server go test ./service -run DnsTunnel`.
@@ -48,7 +55,13 @@ it with every structural change.
 - Clients volume column sorts by `up + down` (`src/views/Clients.vue` headers).
 - Strings: `src/locales/{en,fa}.ts` keys `pages.dnstunnels`, `objects.dnstunnel`, `dnstunnel.*`, `menu.*`; other locales fall back to en.
 
+## sing-box dependency
+
+- Stays on upstream release `sing-box v1.14.4`; managed users live in `core/protocol/*` (+ `core/usersession`, `core/quicgrace`).
+- Fork `jano22gran-hub/Singbox` has the same managed-user code upstreamed, but is **not** wired in: it is private (public builds could not fetch it) and based on upstream `testing`. Wire it (`replace` in `go.mod`, drop `core/protocol/*`) only once it is public and rebased on a release tag.
+- Security: govulncheck clean (brotli 1.2.7, klauspost/compress 1.20.2). Re-run: `GOTOOLCHAIN=go1.27.3 go run golang.org/x/vuln/cmd/govulncheck@latest -tags "$(tags_for test)" ./...`.
+
 ## Upstream sync
-- Synced with `alireza0/s-ui` v1.6.7 (fork version `1.6.7-dns.1`).
+- Synced with `alireza0/s-ui` v1.6.7 (fork version `1.6.7-dns.2`).
 - In-panel update (`service/update.go`, `service/upgrade.go`) and `s-ui.sh` point to `jano22gran-hub/s-ui` releases; tags `vX.Y.Z-dns.N` accepted, `-dns.N` compared as a 4th component.
 - Global traffic reset: `ConfigService.ResetAllTraffic` (in-place user update, core restart fallback).

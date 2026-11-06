@@ -32,6 +32,12 @@ func GetName() string {
 	return strings.TrimSpace(name)
 }
 
+// LogLevelFromEnv reports whether the level is forced by SUI_DEBUG or
+// SUI_LOG_LEVEL; a forced level wins over the panel setting.
+func LogLevelFromEnv() bool {
+	return IsDebug() || os.Getenv("SUI_LOG_LEVEL") != ""
+}
+
 func GetLogLevel() LogLevel {
 	if IsDebug() {
 		return Debug
