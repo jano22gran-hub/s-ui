@@ -37,6 +37,13 @@ it with every structural change.
 - Note: MDV refuses loopback/private *targets*; the forward hop itself may be loopback.
 - DNS setup: `A ns.example.com → server IP`, `NS t.example.com → ns.example.com`; port 53/udp must be free (disable systemd-resolved stub).
 
+## Logging
+
+- Panel level: setting `logLevel` (`""|debug|info|warn|error`, Settings → general). Applied at boot (`app.Init` → `SettingService.ApplyLogLevel`) and after every `settings` save. `SUI_DEBUG` / `SUI_LOG_LEVEL` env override it.
+- `logger/`: `SetLevel`, `ParseLevel`; the in-memory buffer (`GetLogs`, `/api/logs`) only keeps lines at or above the active level.
+- sing-box core level = `config.log.level` (Basics page, stored in setting `config`); core lines also pass through the panel level.
+- Frontend `Logs.vue` remembers filter/count in `localStorage` key `sui.logs.prefs`.
+
 ## Tests
 
 `go test ./...`; real-binary tunnel test: `SUI_MDV_BIN=/path/to/server go test ./service -run DnsTunnel`.

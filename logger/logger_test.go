@@ -12,7 +12,7 @@ import (
 // the buffer. Before addToBuffer and GetLogs shared a mutex this tripped -race
 // on both the append and the re-slice; without -race it only proves no panic.
 func TestBufferConcurrentAccess(t *testing.T) {
-	InitLogger(logging.ERROR)
+	InitLogger(logging.DEBUG)
 	resetBuffer()
 
 	const writers = 8
@@ -44,7 +44,7 @@ func TestBufferConcurrentAccess(t *testing.T) {
 
 // The loop condition was `len(output) <= c`, so each call returned c+1 lines.
 func TestGetLogsRespectsCount(t *testing.T) {
-	InitLogger(logging.ERROR)
+	InitLogger(logging.DEBUG)
 	resetBuffer()
 
 	for i := 0; i < 20; i++ {
@@ -60,7 +60,7 @@ func TestGetLogsRespectsCount(t *testing.T) {
 
 // The mutex change must not alter which levels are returned.
 func TestGetLogsFiltersByLevel(t *testing.T) {
-	InitLogger(logging.ERROR)
+	InitLogger(logging.DEBUG)
 	resetBuffer()
 
 	Debug("a debug line")
@@ -84,7 +84,7 @@ func TestBufferIsBounded(t *testing.T) {
 	if testing.Short() {
 		t.Skip("fills the 10240-entry buffer")
 	}
-	InitLogger(logging.ERROR)
+	InitLogger(logging.DEBUG)
 	resetBuffer()
 
 	for i := 0; i < 10300; i++ {
@@ -94,6 +94,9 @@ func TestBufferIsBounded(t *testing.T) {
 	bufferMu.Lock()
 	size := len(logBuffer)
 	bufferMu.Unlock()
+	if size == 0 {
+		t.Fatal("nothing was buffered")
+	}
 	if size > 10240 {
 		t.Errorf("buffer grew past its bound: %d entries", size)
 	}
@@ -103,4 +106,39 @@ func resetBuffer() {
 	bufferMu.Lock()
 	logBuffer = nil
 	bufferMu.Unlock()
+}
+
+// The buffer behind the panel's log view used to keep every line, so debug
+// output showed up whatever level was configured.
+func TestBufferHonoursLevel(t *testing.T) {
+	InitLogger(logging.WARNING)
+	resetBuffer()
+
+	Debug("d")
+	Info("i")
+	Warning("w")
+	Error("e")
+	if got := len(GetLogs(100, "debug")); got != 2 {
+		t.Fatalf("buffered %d lines at WARNING, want 2", got)
+	}
+
+	SetLevel(logging.DEBUG)
+	Debug("d2")
+	if got := len(GetLogs(100, "debug")); got != 3 {
+		t.Fatalf("buffered %d lines after SetLevel(DEBUG), want 3", got)
+	}
+}
+
+func TestParseLevel(t *testing.T) {
+	for name, want := range map[string]logging.Level{
+		"debug": logging.DEBUG, "info": logging.INFO, "warn": logging.WARNING,
+		"warning": logging.WARNING, "error": logging.ERROR,
+	} {
+		if got, ok := ParseLevel(name); !ok || got != want {
+			t.Errorf("ParseLevel(%q) = %v, %v", name, got, ok)
+		}
+	}
+	if _, ok := ParseLevel("loud"); ok {
+		t.Error("unknown level accepted")
+	}
 }

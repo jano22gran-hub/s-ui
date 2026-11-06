@@ -16,7 +16,8 @@ type logEntry struct {
 }
 
 var (
-	logger *logging.Logger
+	logger  *logging.Logger
+	leveled logging.LeveledBackend
 
 	// bufferMu guards logBuffer. Every cron job, HTTP handler and sing-box
 	// connection goroutine appends to it, while GetLogs reads it from the
@@ -60,6 +61,36 @@ func InitLogger(level logging.Level) {
 	newLogger.SetBackend(backendLeveled)
 
 	logger = newLogger
+	leveled = backendLeveled
+}
+
+// ParseLevel maps a panel/env level name to a go-logging level.
+func ParseLevel(name string) (logging.Level, bool) {
+	switch name {
+	case "debug":
+		return logging.DEBUG, true
+	case "info":
+		return logging.INFO, true
+	case "warn", "warning":
+		return logging.WARNING, true
+	case "error":
+		return logging.ERROR, true
+	}
+	return logging.INFO, false
+}
+
+// SetLevel changes the level at runtime. It also gates what reaches the
+// in-memory buffer shown in the panel.
+func SetLevel(level logging.Level) {
+	if leveled != nil {
+		leveled.SetLevel(level, "s-ui")
+	}
+}
+
+func enabled(level logging.Level) bool {
+	// Not logger.IsEnabledFor: that asks go-logging's global default backend,
+	// not the one InitLogger installed.
+	return leveled == nil || leveled.IsEnabledFor(level, "s-ui")
 }
 
 func GetLogger() *logging.Logger {
@@ -109,6 +140,11 @@ func Errorf(format string, args ...interface{}) {
 func addToBuffer(level string, newLog string) {
 	t := time.Now()
 	logLevel, _ := logging.LogLevel(level)
+	// Lines below the configured level used to be buffered anyway, so the
+	// panel showed debug output whatever level was chosen.
+	if !enabled(logLevel) {
+		return
+	}
 
 	bufferMu.Lock()
 	defer bufferMu.Unlock()

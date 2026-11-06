@@ -99,6 +99,7 @@ var defaultValueMap = map[string]string{
 	"maintenance":        "false",
 	"globalReset":        "",
 	"globalResetLast":    "0",
+	"logLevel":           "",
 	"config":             defaultConfig,
 	"version":            config.GetVersion(),
 }
@@ -501,6 +502,12 @@ func (s *SettingService) Save(tx *gorm.DB, data json.RawMessage) error {
 			}
 		}
 
+		if key == "logLevel" && obj != "" {
+			if _, ok := logger.ParseLevel(obj); !ok {
+				return common.NewError("invalid log level <", obj, ">")
+			}
+		}
+
 		// A bad spec used to be accepted here and only logged at the next
 		// panel start, so the reset silently never ran.
 		if key == "globalReset" && obj != "" && obj != "off" {
@@ -542,6 +549,29 @@ func (s *SettingService) Save(tx *gorm.DB, data json.RawMessage) error {
 		}
 	}
 	return nil
+}
+
+// GetLogLevel returns the panel log level saved from the settings page; empty
+// means the default (info, or the env override).
+func (s *SettingService) GetLogLevel() string {
+	level, _ := s.getString("logLevel")
+	return level
+}
+
+// ApplyLogLevel applies the saved panel log level unless SUI_DEBUG or
+// SUI_LOG_LEVEL forces one. Without this the level chosen in the panel was
+// lost on every restart.
+func (s *SettingService) ApplyLogLevel() {
+	if config.LogLevelFromEnv() {
+		return
+	}
+	name := s.GetLogLevel()
+	if name == "" {
+		name = "info"
+	}
+	if level, ok := logger.ParseLevel(name); ok {
+		logger.SetLevel(level)
+	}
 }
 
 func (s *SettingService) GetSubJsonExt() (string, error) {

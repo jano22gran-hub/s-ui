@@ -420,6 +420,9 @@ func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initU
 		switch obj {
 		case "dnstunnels", "inbounds", "clients":
 			go s.DnsTunnelService.Sync()
+		case "settings":
+			// Takes effect now, not only after the next restart.
+			s.SettingService.ApplyLogLevel()
 		}
 		if restartWith != nil {
 			// Detached: a restart takes seconds and this is an HTTP handler.
