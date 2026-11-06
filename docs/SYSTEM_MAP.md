@@ -55,6 +55,12 @@ it with every structural change.
 - Clients volume column sorts by `up + down` (`src/views/Clients.vue` headers).
 - Strings: `src/locales/{en,fa}.ts` keys `pages.dnstunnels`, `objects.dnstunnel`, `dnstunnel.*`, `menu.*`; other locales fall back to en.
 
+## sing-box dependency
+
+- Stays on upstream release `sing-box v1.14.4`; managed users live in `core/protocol/*` (+ `core/usersession`, `core/quicgrace`).
+- Fork `jano22gran-hub/Singbox` has the same managed-user code upstreamed, but is **not** wired in: it is private (public builds could not fetch it) and based on upstream `testing`. Wire it (`replace` in `go.mod`, drop `core/protocol/*`) only once it is public and rebased on a release tag.
+- Security: govulncheck clean (brotli 1.2.7, klauspost/compress 1.20.2). Re-run: `GOTOOLCHAIN=go1.27.3 go run golang.org/x/vuln/cmd/govulncheck@latest -tags "$(tags_for test)" ./...`.
+
 ## Upstream sync
 - Synced with `alireza0/s-ui` v1.6.7 (fork version `1.6.7-dns.1`).
 - In-panel update (`service/update.go`, `service/upgrade.go`) and `s-ui.sh` point to `jano22gran-hub/s-ui` releases; tags `vX.Y.Z-dns.N` accepted, `-dns.N` compared as a 4th component.
