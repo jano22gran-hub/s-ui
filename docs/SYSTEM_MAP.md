@@ -57,6 +57,7 @@ it with every structural change.
 
 ## Subscription defaults
 
+- `ensureCacheFile`: adds `experimental.cache_file.enabled` unless the JSON extension sets `cache_file` (clients keep the node picked in "proxy" across restarts; tests `sub/json_cache_file_test.go`).
 - `sub/jsonService.go` `defaultJson`: tun `stack: gvisor` (system stack left Android TCP stuck after pre-match on cellular; test `sub/json_tun_stack_test.go`), mtu 9000, auto_route, mixed 127.0.0.1:2080.
 
 ## sing-box dependency
@@ -66,6 +67,6 @@ it with every structural change.
 - Security: govulncheck clean (brotli 1.2.7, klauspost/compress 1.20.2). Re-run: `GOTOOLCHAIN=go1.27.3 go run golang.org/x/vuln/cmd/govulncheck@latest -tags "$(tags_for test)" ./...`.
 
 ## Upstream sync
-- Synced with `alireza0/s-ui` v1.6.7 (fork version `1.6.7-dns.3`).
+- Synced with `alireza0/s-ui` v1.6.7 (fork version `1.6.7-dns.4`).
 - In-panel update (`service/update.go`, `service/upgrade.go`) and `s-ui.sh` point to `jano22gran-hub/s-ui` releases; tags `vX.Y.Z-dns.N` accepted, `-dns.N` compared as a 4th component.
 - Global traffic reset: `ConfigService.ResetAllTraffic` (in-place user update, core restart fallback).

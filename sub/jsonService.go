@@ -76,6 +76,7 @@ func (j *JsonService) GetJson(subId string, format string) (*string, []string, e
 
 	// Add other objects from settings
 	j.addOthers(&jsonConfig)
+	ensureCacheFile(jsonConfig)
 
 	result, _ := json.MarshalIndent(jsonConfig, "", "  ")
 	resultStr := string(result)
@@ -280,6 +281,20 @@ func (j *JsonService) addDefaultOutbounds(outbounds *[]map[string]interface{}, o
 		},
 	}
 	*outbounds = append(outbound, *outbounds...)
+}
+
+// ensureCacheFile turns on sing-box's cache file unless the operator's JSON
+// extension sets cache_file itself. Without it a client forgets the node
+// picked in the "proxy" selector on every restart and falls back to "auto".
+func ensureCacheFile(jsonConfig map[string]interface{}) {
+	experimental, _ := jsonConfig["experimental"].(map[string]interface{})
+	if experimental == nil {
+		experimental = map[string]interface{}{}
+		jsonConfig["experimental"] = experimental
+	}
+	if _, set := experimental["cache_file"]; !set {
+		experimental["cache_file"] = map[string]interface{}{"enabled": true}
+	}
 }
 
 func (j *JsonService) addOthers(jsonConfig *map[string]interface{}) error {
